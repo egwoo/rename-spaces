@@ -23,11 +23,11 @@ public struct SpaceNameStore: Codable, Equatable {
     }
 
     public mutating func setName(_ name: String, for spaceID: String) {
-        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        if trimmed.isEmpty {
+        let isBlank = name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        if isBlank {
             names.removeValue(forKey: spaceID)
         } else {
-            names[spaceID] = trimmed
+            names[spaceID] = name
         }
     }
 

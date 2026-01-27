@@ -9,12 +9,12 @@ final class SpaceNameStoreTests: XCTestCase {
         XCTAssertEqual(store.displayName(for: "space-4", fallbackIndex: 4), "Desktop 4")
     }
 
-    func testSetNameTrimsWhitespace() {
+    func testSetNamePreservesWhitespace() {
         var store = SpaceNameStore(names: [:])
 
         store.setName("  Focus  ", for: "space-2")
 
-        XCTAssertEqual(store.displayName(for: "space-2", fallbackIndex: 2), "Focus")
+        XCTAssertEqual(store.displayName(for: "space-2", fallbackIndex: 2), "  Focus  ")
     }
 
     func testSetNameClearsWhenBlank() {
