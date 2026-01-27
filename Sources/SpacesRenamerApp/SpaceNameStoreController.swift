@@ -8,7 +8,7 @@ final class SpaceNameStoreController: ObservableObject {
     static let spaceCountKey = "SpaceCount.v2"
 
     @Published private(set) var store: SpaceNameStore
-    @Published private(set) var orderedSpaceIDs: [String]
+    @Published private(set) var orderedSpaces: [SpaceDescriptor]
     @Published private(set) var fallbackSpaceCount: Int
 
     private let persistence: SpaceNameStorePersistence
@@ -22,7 +22,7 @@ final class SpaceNameStoreController: ObservableObject {
 
         let loadedStore = persistence.load()
         self.store = loadedStore
-        self.orderedSpaceIDs = []
+        self.orderedSpaces = []
         self.legacyNamesByIndex = persistence.loadLegacy()?.names
 
         let storedCount = userDefaults.integer(forKey: Self.spaceCountKey)
@@ -36,62 +36,71 @@ final class SpaceNameStoreController: ObservableObject {
     }
 
     var spaceCount: Int {
-        orderedSpaceIDs.isEmpty ? fallbackSpaceCount : orderedSpaceIDs.count
+        orderedSpaces.isEmpty ? fallbackSpaceCount : orderedSpaces.count
     }
 
     var hasOrderedSpaces: Bool {
-        !orderedSpaceIDs.isEmpty
+        !orderedSpaces.isEmpty
     }
 
     func refreshSpaceOrder() {
-        let newOrder = SpaceOrderReader.orderedSpaceIDs()
-        guard !newOrder.isEmpty else {
+        let newSpaces = SpaceOrderReader.orderedSpaces()
+        guard !newSpaces.isEmpty else {
             return
         }
-        if newOrder != orderedSpaceIDs {
-            orderedSpaceIDs = newOrder
+        if newSpaces != orderedSpaces {
+            orderedSpaces = newSpaces
         }
-        if fallbackSpaceCount != newOrder.count {
-            fallbackSpaceCount = newOrder.count
+        if fallbackSpaceCount != newSpaces.count {
+            fallbackSpaceCount = newSpaces.count
             userDefaults.set(fallbackSpaceCount, forKey: Self.spaceCountKey)
         }
         applyLegacyNamesIfNeeded()
     }
 
     func displayName(for index: Int) -> String {
-        guard let spaceID = spaceID(for: index) else {
+        guard let spaceIDs = spaceIDs(for: index) else {
             return "Desktop \(index)"
         }
-        return store.displayName(for: spaceID, fallbackIndex: index)
+        if let name = resolvedName(for: spaceIDs) {
+            return name
+        }
+        return "Desktop \(index)"
     }
 
     func customName(for index: Int) -> String {
-        guard let spaceID = spaceID(for: index) else {
+        guard let spaceIDs = spaceIDs(for: index) else {
             return ""
         }
-        return store.customName(for: spaceID) ?? ""
+        return resolvedCustomName(for: spaceIDs) ?? ""
     }
 
     func hasCustomName(for index: Int) -> Bool {
-        guard let spaceID = spaceID(for: index) else {
+        guard let spaceIDs = spaceIDs(for: index) else {
             return false
         }
-        return store.hasCustomName(for: spaceID)
+        return resolvedCustomName(for: spaceIDs)?.isEmpty == false
     }
 
     func setName(_ name: String, for index: Int) {
-        guard let spaceID = spaceID(for: index) else {
+        guard let ids = spaceIDs(for: index),
+              let primaryID = primarySpaceID(for: index) else {
             return
         }
-        store.setName(name, for: spaceID)
+        for id in ids {
+            store.clearName(for: id)
+        }
+        store.setName(name, for: primaryID)
         persistence.save(store)
     }
 
     func clearName(for index: Int) {
-        guard let spaceID = spaceID(for: index) else {
+        guard let ids = spaceIDs(for: index) else {
             return
         }
-        store.clearName(for: spaceID)
+        for id in ids {
+            store.clearName(for: id)
+        }
         persistence.save(store)
     }
 
@@ -109,29 +118,55 @@ final class SpaceNameStoreController: ObservableObject {
         userDefaults.set(fallbackSpaceCount, forKey: Self.spaceCountKey)
     }
 
-    private func spaceID(for index: Int) -> String? {
-        guard index > 0, index <= orderedSpaceIDs.count else {
+    private func spaceIDs(for index: Int) -> [String]? {
+        guard index > 0, index <= orderedSpaces.count else {
             return nil
         }
-        return orderedSpaceIDs[index - 1]
+        return orderedSpaces[index - 1].allIDs
+    }
+
+    private func primarySpaceID(for index: Int) -> String? {
+        guard index > 0, index <= orderedSpaces.count else {
+            return nil
+        }
+        return orderedSpaces[index - 1].primaryID
+    }
+
+    private func resolvedCustomName(for ids: [String]) -> String? {
+        for id in ids {
+            if let name = store.customName(for: id) {
+                return name
+            }
+        }
+        return nil
+    }
+
+    private func resolvedName(for ids: [String]) -> String? {
+        for id in ids {
+            if let name = store.customName(for: id), !name.isEmpty {
+                return name
+            }
+        }
+        return nil
     }
 
     private func applyLegacyNamesIfNeeded() {
         guard let legacy = legacyNamesByIndex, !legacy.isEmpty else {
             return
         }
-        guard !orderedSpaceIDs.isEmpty else {
+        guard !orderedSpaces.isEmpty else {
             return
         }
         var migrated = store
         for (index, name) in legacy {
-            guard let spaceID = spaceID(for: index) else {
+            guard let primaryID = primarySpaceID(for: index) else {
                 continue
             }
-            migrated.setName(name, for: spaceID)
+            migrated.setName(name, for: primaryID)
         }
         store = migrated
         persistence.save(store)
+        persistence.clearLegacy()
         legacyNamesByIndex = nil
     }
 }

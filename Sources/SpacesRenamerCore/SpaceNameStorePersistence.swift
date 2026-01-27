@@ -30,6 +30,10 @@ public struct SpaceNameStorePersistence {
         return try? decoder.decode(SpaceNameStoreLegacy.self, from: data)
     }
 
+    public func clearLegacy() {
+        userDefaults.removeObject(forKey: Self.legacyStorageKey)
+    }
+
     public func save(_ store: SpaceNameStore) {
         guard let data = try? encoder.encode(store) else {
             return
