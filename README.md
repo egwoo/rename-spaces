@@ -10,6 +10,16 @@ Rename Spaces is a macOS menu bar app that overlays custom Space names in Missio
 #### Menu
 ![Menu bar app](assets/menu.png)
 
+## Install (curl)
+
+```bash
+curl -fsSL "https://raw.githubusercontent.com/egwoo/rename-spaces/main/scripts/install.sh?$(date +%s)" | bash -s -- --yes
+```
+
+Notes:
+- This pulls the latest GitHub Release and expects a `Rename Spaces.zip` asset.
+- The app is not signed/notarized, so Gatekeeper may warn. The script attempts to remove quarantine.
+
 ## Build
 
 ```bash
