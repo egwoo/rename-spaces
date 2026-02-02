@@ -138,6 +138,14 @@ struct MenuContentView: View {
                         NSWorkspace.shared.activateFileViewerSelecting([url])
                     }
                     .font(.caption)
+                    Button("Log Overlay Detail") {
+                        overlayController.logOverlayDetail(reason: "manual")
+                    }
+                    .font(.caption)
+                    Button("Recreate Overlay Window") {
+                        overlayController.recreateOverlayWindow()
+                    }
+                    .font(.caption)
                 }
                 .padding(.top, 6)
             }

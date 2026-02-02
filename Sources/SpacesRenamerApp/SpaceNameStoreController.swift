@@ -14,6 +14,7 @@ final class SpaceNameStoreController: ObservableObject {
     private let persistence: SpaceNameStorePersistence
     private let userDefaults: UserDefaults
     private var legacyNamesByIndex: [Int: String]?
+    private var uuidCacheByID64: [Int: String] = [:]
 
     init(persistence: SpaceNameStorePersistence = SpaceNameStorePersistence(),
          userDefaults: UserDefaults = .standard) {
@@ -48,11 +49,23 @@ final class SpaceNameStoreController: ObservableObject {
         guard !newSpaces.isEmpty else {
             return
         }
-        if newSpaces != orderedSpaces {
-            orderedSpaces = newSpaces
+
+        let normalizedSpaces = newSpaces.map { descriptor -> SpaceDescriptor in
+            var resolvedUUID = descriptor.uuid
+            if (resolvedUUID?.isEmpty ?? true), let cached = uuidCacheByID64[descriptor.id64] {
+                resolvedUUID = cached
+            }
+            if let resolvedUUID, !resolvedUUID.isEmpty {
+                uuidCacheByID64[descriptor.id64] = resolvedUUID
+            }
+            return SpaceDescriptor(id64: descriptor.id64, uuid: resolvedUUID)
         }
-        if fallbackSpaceCount != newSpaces.count {
-            fallbackSpaceCount = newSpaces.count
+
+        if normalizedSpaces != orderedSpaces {
+            orderedSpaces = normalizedSpaces
+        }
+        if fallbackSpaceCount != normalizedSpaces.count {
+            fallbackSpaceCount = normalizedSpaces.count
             userDefaults.set(fallbackSpaceCount, forKey: Self.spaceCountKey)
         }
         applyLegacyNamesIfNeeded()
@@ -107,6 +120,30 @@ final class SpaceNameStoreController: ObservableObject {
     func resetAll() {
         store = SpaceNameStore()
         persistence.save(store)
+    }
+
+    func debugInfo(for indices: [Int]) -> String {
+        let sorted = indices.sorted()
+        var parts: [String] = []
+        parts.append("ordered=\(orderedSpaces.count)")
+        parts.append("storeKeys=\(store.names.count)")
+        let details = sorted.map { index -> String in
+            guard index > 0, index <= orderedSpaces.count else {
+                return "\(index){missing}"
+            }
+            let descriptor = orderedSpaces[index - 1]
+            let ids = descriptor.allIDs
+            let name = resolvedCustomName(for: ids)
+            let hasName = (name?.isEmpty == false)
+            let length = name?.count ?? 0
+            let uuid = descriptor.uuidString ?? "nil"
+            let id64 = descriptor.id64String
+            return "\(index){uuid=\(uuid),id64=\(id64),primary=\(descriptor.primaryID),hasName=\(hasName),len=\(length)}"
+        }
+        if !details.isEmpty {
+            parts.append("indices=\(details.joined(separator: " "))")
+        }
+        return parts.joined(separator: " ")
     }
 
     func updateSpaceCount(_ newValue: Int) {

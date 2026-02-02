@@ -20,6 +20,9 @@ struct SpacesRenamerApp: App {
             },
             spaceOrderUpdater: {
                 controller.refreshSpaceOrder()
+            },
+            debugInfoProvider: { indices in
+                controller.debugInfo(for: indices)
             }
         )
         _controller = StateObject(wrappedValue: controller)
